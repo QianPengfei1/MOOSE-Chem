@@ -1,5 +1,5 @@
 import os, json, argparse
-
+#在这里可以自定义研究背景
 
 def research_background_to_json(research_background_file_path):
     # YOUR RESEARCH QUESTION HERE

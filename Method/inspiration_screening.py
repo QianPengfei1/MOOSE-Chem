@@ -91,9 +91,16 @@ class Screening(object):
         
         # save files
         if self.args.if_save:
-            with open(self.args.output_dir, 'w') as f:
-                json.dump([organized_Dict_bkg_q_2_screen_results, Dict_bkg_q_2_ratio_hit], f)
-            print("\nSaved to: ", self.args.output_dir)
+            # === 关键修复：确保输出目录存在 ===
+            import os
+            output_dir = self.args.output_dir
+            os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+
+            # 保存文件
+            with open(output_dir, 'w', encoding='utf-8') as f:
+                json.dump([organized_Dict_bkg_q_2_screen_results, Dict_bkg_q_2_ratio_hit], f, indent=2, ensure_ascii=False)
+            
+            print("\nSaved to: ", output_dir)
         else:
             print("\nNot saved.")
 
