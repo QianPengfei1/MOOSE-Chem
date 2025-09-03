@@ -9,11 +9,12 @@ from Method.logging_utils import setup_logger
 from google import genai
 
 class HypothesisGenerationEA(object):
-    # custom_rq (text) and custom_bs (text) are used when the user has their own research question and background survey to work on (but not those in the Tomato-Chem benchmark), and leverage MOOSE-Chem for inference
+    # custom_rq（文本）和custom_bs（文本）用于用户拥有自己的研究问题和背景调查（而非基准中的内容）时，并利用MOOSE-Chem进行推理。
     def __init__(self, args, custom_rq=None, custom_bs=None) -> None:
         self.args = args
         self.custom_rq = custom_rq
         self.custom_bs = custom_bs
+
         ## Set API client
         # openai client
         if args.api_type == 0:
@@ -30,25 +31,34 @@ class HypothesisGenerationEA(object):
             self.client = genai.Client(api_key=args.api_key)
         else:
             raise NotImplementedError
-        ## Load research background: Use the research question and background survey in Tomato-Chem or the custom ones from input
+
+
+        ## 加载研究背景：使用Tomato-Chem中的研究问题和背景调查，或从输入中获取自定义内容
         if custom_rq == None and custom_bs == None:
             # annotated bkg research question and its annotated groundtruth inspiration paper titles
             self.bkg_q_list, self.dict_bkg2insp, self.dict_bkg2survey, self.dict_bkg2groundtruthHyp, self.dict_bkg2note, self.dict_bkg2idx, self.dict_idx2bkg, self.dict_bkg2reasoningprocess = load_chem_annotation(args.chem_annotation_path, self.args.if_use_strict_survey_question, self.args.if_use_background_survey)   
         else:
+            #使用自定义研究背景
             print("INFO: Using custom_rq and custom_bs.")
             assert custom_rq != None
             self.bkg_q_list = [custom_rq]
             self.dict_bkg2survey = {custom_rq: custom_bs}
             self.dict_idx2bkg = {0: custom_rq}   
-        ## Load inspiration corpus (by default is the groundtruth inspiration papers and random high-quality papers)
+
+        ## 加载灵感语料库（默认包含基准灵感论文和随机高质量论文）
         # title_abstract_collector: [[title, abstract], ...]
         # dict_title_2_abstract: {'title': 'abstract', ...}
+
+        #加载灵感论文的标题和摘要
         self.title_abstract_collector, self.dict_title_2_abstract = load_dict_title_2_abstract(title_abstract_collector_path=args.custom_inspiration_corpus_path)
-        ## Load the selected inspirations from the inspiration corpus (results from inspiration_screening.py)
+        
+        ## 从灵感语料库中加载所选灵感 (results from inspiration_screening.py)
         if args.if_use_gdth_insp == 0:
+            ## 使用筛选后的灵感
             # organized_insp: {'bq': [[title, reason], [title, reason], ...]}
             self.organized_insp, self.dict_bkg_insp2idx, self.dict_bkg_idx2insp = load_found_inspirations(inspiration_path=args.inspiration_dir, idx_round_of_first_step_insp_screening=args.idx_round_of_first_step_insp_screening)
         else:
+            # # 使用gt真实灵感
             # organized_insp: {'bq': [[title, reason], [title, reason], ...]}
             bkg_q = self.bkg_q_list[args.background_question_id]
             self.organized_insp, self.dict_bkg_insp2idx, self.dict_bkg_idx2insp = load_groundtruth_inspirations_as_screened_inspirations(bkg_q=bkg_q, dict_bkg2insp=self.dict_bkg2insp)
@@ -58,49 +68,63 @@ class HypothesisGenerationEA(object):
             print("Warning: using groundtruth inspirations for hypothesis generation..")
             print("bkg_q: ", bkg_q)
 
-
+    #假设集合: {背景问题: {核心灵感标题: [[假设, 推理过程], ...]}, ...}
     # hypothesis_collection: {backgroud_question: {core_insp_title: [[hypothesis, reasoning process], ...]}, ...}
+
     ## Input
+    # background_question_id: int
+    # inspiration_ids: list; [-1]: 遍历所有灵感; 否则: 仅为列表中指定的灵感ID生成假设
+    # final_data_collection: 先前处理过的数据。若为None，则初始化该集合；否则保留其现有灵感岛，并在输入灵感ID中发展灵感，但不在final_data_collection中进行
+    
     # background_question_id: int
     # inspiration_ids: list; [-1]: iterate over all inspirations; otherwise: only generate hypothesis for specified inspiration ids in the list
     # final_data_collection: previously processed data. If None, we will initialize it, else we will keep its existing inspiration islands, and develop inspirations in input inspiration_ids but not in final_data_collection
+    
     ## Output
+    # final_data_collection: {背景问题: {核心灵感标题: 假设变异集合, ...}, ...}
     # final_data_collection: {backgroud_question: {core_insp_title: hypthesis_mutation_collection, ...}, ...}
+    
     def hypothesis_generation_for_one_background_question(self, background_question_id, inspiration_ids=[-1], final_data_collection=None):
         ### intra-EA mutation 
         print("\nHypothesis generation for one background question..")
         assert type(inspiration_ids) == list
+
         # backgroud_question
         backgroud_question = self.dict_idx2bkg[background_question_id]
         # screened_insp_cur_bq: [[title, reason], [title, reason], ...]
         screened_insp_cur_bq = self.organized_insp[backgroud_question]
-        # not a sufficient, but a necessary condition to make sure the ids in inspiration_ids correspond to the ids in screened_insp_cur_bq
+        # 并非充分条件，但却是确保inspiration_ids中的ID与screened_insp_cur_bq中的ID对应的必要条件。
         assert max(inspiration_ids) < len(screened_insp_cur_bq), "inspiration_ids should be less than the number of inspirations in the background question: max(inspiration_ids): {}; len(screened_insp_cur_bq): {}".format(max(inspiration_ids), len(screened_insp_cur_bq))
+        
+        #初始化数据结构
         # initialize final_data_collection if it is None
         if final_data_collection == None:
             final_data_collection = {}            
         if backgroud_question not in final_data_collection:
             final_data_collection[backgroud_question] = {}
-        # iterate over each core inspiration
+
+        # 遍历灵感生成假设
         for cur_insp_id in range(len(screened_insp_cur_bq)):
             cur_insp_title = screened_insp_cur_bq[cur_insp_id][0]
             if -1 not in inspiration_ids and cur_insp_id not in inspiration_ids:
                 continue
-            # only develop hypothesis for the inspirations that are in given inspiration_ids but are not in final_data_collection[backgroud_question]
+            # 检查当前灵感的标题是否已经存在于最终数据集合中，如果已经存在，说明这个灵感已经被处理过，跳过当前循环
             if cur_insp_title in final_data_collection[backgroud_question]:
                 continue
             print("cur_insp_id: {}; cur_insp_title: {}".format(cur_insp_id, cur_insp_title))
-            # generate hypothesis for one background question and one inspiration
-            # hypthesis_mutation_collection: {mutation_id: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]}
+
+            # 为一个背景问题和一个灵感生成假设
+
+            # 假设变异集合 hypthesis_mutation_collection: {mutation_id: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]}
             hypthesis_mutation_collection = self.hypothesis_generation_for_one_bkg_one_insp(background_question_id, cur_insp_id)
-            # save to final_data_collection
+            # save to final_data_collection 保存结果
             final_data_collection[backgroud_question][cur_insp_title] = hypthesis_mutation_collection
         
         # save file
         if self.args.if_save:
             self.save_file(final_data_collection, self.args.output_dir)
 
-        # inter-EA recombination and self-explore extra knowledge for the second, the third, ... inspiration exploration step
+        # 跨EA重组与自我探索为第二、第三...灵感探索步骤提供额外知识
         if self.args.max_inspiration_search_steps >= 2:
             for cur_step_id in range(2, self.args.max_inspiration_search_steps+1):
                 final_data_collection = self.controller_additional_inspiration_step_hypothesis_generation(background_question_id, final_data_collection, step_id=cur_step_id)
@@ -451,67 +475,89 @@ class HypothesisGenerationEA(object):
 
 
     ## Function
+    #为一个背景问题和一个灵感生成假设（含或不含变异）（含或不含优化）
     # generate hypotheses (w/ or w/o mutation) (w/ or w/o refinement) for one background question and one inspiration
     ## Input
     # background_question_id: int
     # inspiration_id: int
     ## Output
+    #假设变异集合: {变异ID: [[假设0, 推理过程0, 反馈0], [假设1, 推理过程1, 反馈1], ...]}
     # hypthesis_mutation_collection: {mutation_id: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]}
     def hypothesis_generation_for_one_bkg_one_insp(self, background_question_id, inspiration_id):
-        assert self.args.if_mutate_inside_same_bkg_insp in [0, 1]
-        ## prepare background and inspiration information
+        assert self.args.if_mutate_inside_same_bkg_insp in [0, 1]   #验证是否开启了内部突变功能
+
+        ## 准备背景和灵感信息，通过ID获取研究背景问题和背景调查
         # backgroud_question
         backgroud_question = self.dict_idx2bkg[background_question_id]
         # backgroud_survey
         backgroud_survey = self.dict_bkg2survey[backgroud_question]
         # screened_insp_cur_bq: [[title, reason], [title, reason], ...]
         screened_insp_cur_bq = self.organized_insp[backgroud_question]
+
+        #最终构建完整的灵感节点
         # add abstract in addition to title and reason in screened_insp_cur_bq
         cur_insp_core_node = screened_insp_cur_bq[inspiration_id]
         cur_title = cur_insp_core_node[0]
-        # cur_abstract = self.dict_title_2_abstract[cur_title]
-        cur_abstract = get_item_from_dict_with_very_similar_but_not_exact_key(self.dict_title_2_abstract, cur_title)
+        cur_abstract = get_item_from_dict_with_very_similar_but_not_exact_key(self.dict_title_2_abstract, cur_title)#处理标题可能不完全匹配的情况
         # cur_insp_core_node: [title, reason, abstract]
         cur_insp_core_node.append(cur_abstract)
 
-        ## generate several distinct mutation hyp, and develop them by refinement for each line of mutation
+        ## 生成若干独立的突变假设，并针对每条突变路径进行精炼开发
+
+        #假设突变集合: {突变ID: [[假设0, 推理过程0, 反馈0], [假设1, 推理过程1, 反馈1], ...]}
         # hypthesis_mutation_collection: {mutation_id: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]}
         hypthesis_mutation_collection = {}
+
+        #生成初始假设（突变0）
         # hypothesis_collection: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]
         hypothesis_collection = self.hyothesis_generation_with_refinement(backgroud_question, backgroud_survey, cur_insp_core_node, other_mutations=None)
-        hypthesis_mutation_collection['0'] = hypothesis_collection
-        if self.args.if_mutate_inside_same_bkg_insp == 1:
-            for cur_mutation_id in range(1, self.args.num_mutations):
+        hypthesis_mutation_collection['0'] = hypothesis_collection      #将初始假设存储在突变集合中，键为'0'
+        
+        if self.args.if_mutate_inside_same_bkg_insp == 1:               # 生成突变（如果开启）
+            for cur_mutation_id in range(1, self.args.num_mutations):    #循环指定突变次
                 # other_mutations: the most refined hypothesis from other mutations
-                other_mutations = [hypthesis_mutation_collection[mut_id][-1][0] for mut_id in hypthesis_mutation_collection]
+                other_mutations = [hypthesis_mutation_collection[mut_id][-1][0] for mut_id in hypthesis_mutation_collection]    #收集所有已生成突变的最优假设（每个突变的最终精炼结果），作为新突变的输入，[-1]: 获取该突变的最后一个（最精炼的）假设
+                #调用hyothesis_generation_with_refinement方法生成新的假设集合。传入相同的背景问题、背景调查和灵感核心节点，关键参数：other_mutations=other_mutations - 将收集到的最优假设作为输入。这个方法会生成一个完整的假设精炼序列（多轮精炼的结果）
                 hypothesis_collection = self.hyothesis_generation_with_refinement(backgroud_question, backgroud_survey, cur_insp_core_node, other_mutations=other_mutations)
-                hypthesis_mutation_collection[str(cur_mutation_id)] = hypothesis_collection
+                hypthesis_mutation_collection[str(cur_mutation_id)] = hypothesis_collection         #存储新突变
+                """这段代码体现了进化算法的核心思想：
+                初始种群：突变0作为初始假设
+                变异操作：每次循环生成一个新的突变（变异个体）
+                环境压力：通过other_mutations参数引入选择压力，迫使新突变与已有突变不同
+                种群增长：逐步构建一个多样化的假设种群
+                """
 
+        #执行重组突变
         ## re-combinational mutation between different mutation lines developed from the same bkq and insp
         if self.args.if_mutate_inside_same_bkg_insp == 1:
             print("Recombinational mutation")
-            assert len(hypthesis_mutation_collection) > 1
-            other_mutations = [hypthesis_mutation_collection[mut_id][-1][0] for mut_id in hypthesis_mutation_collection]
-            hypothesis_collection = self.hyothesis_generation_with_refinement(backgroud_question, backgroud_survey, cur_insp_core_node, other_mutations=other_mutations, recombination_type=1)
+            assert len(hypthesis_mutation_collection) > 1       #确保有多个突变线可用于重组
+            other_mutations = [hypthesis_mutation_collection[mut_id][-1][0] for mut_id in hypthesis_mutation_collection]    #收集所有突变线的最优假设作为重组输入
+            hypothesis_collection = self.hyothesis_generation_with_refinement(backgroud_question, backgroud_survey, cur_insp_core_node, other_mutations=other_mutations, recombination_type=1)  #重组
             hypthesis_mutation_collection['recom'] = hypothesis_collection
-        return hypthesis_mutation_collection
+        return hypthesis_mutation_collection        #返回包含所有突变和重组结果的字典
             
 
     ## Function
+    #生成带优化（含/不含突变）的假设
     # generate hypothesis with refinement (w/ or w/o mutation)
+
     ## Input:
-    # backgroud_question: text  
-    # backgroud_survey: text
+    # backgroud_question: text  背景问题
+    # backgroud_survey: text     背景调查
     # cur_insp_core_node: [title, reason, abstract]
-    # other_mutations: [hyp0, hyp1, ...], here 0, 1 indicates the id of mutation; or None; used for developing a new mutation line
+
+    # other_mutations: [hyp0, hyp1, ...], 处0、1表示突变标识符；或None；用于开发新突变分支
+
     # recombination_type: 0/1/2; 
-    #   2: recombinational mutation between the final hypothesis developed from (the same background and) different inspirations;
-    #   1: recombinational mutation between the last refined hypothesis over each mutation line. Each line is developed from the same background and the same inspiration; 
-    #   0: develop a new mutation line
-    # this_mutation: text of a hypothesis (already developed based on cur_insp_core_node); only used when recombination_type=2 (recombinational mutation between the final hypothesis developed from the same bkq and different insp, and this_mutation is the hypothesis developed from cur_insp_core_node)
-    # if_self_eval_for_final_hyp: bool, default is True; whether we provide numerical evaluation for the final hypothesis (final hypothesis: the last refined hypothesis)
+    #   2: 基于相同背景但不同灵感来源的最终假说间进行重组突变；
+    #   1: 在每条突变系上对最后优化假说进行重组突变。每条系均基于相同背景和相同灵感来源开发； 
+    #   0: 开发新突变系
+    # 假设文本（基于 cur_insp_core_node 已开发）；仅当重组类型=2时使用（同一背景不同灵感间最终假设的重组突变，且 this_mutation 是基于 cur_insp_core_node 开发的假设）
+    # if_self_eval_for_final_hyp: 布尔值，默认True；是否为最终假设（最终假设：最后一次精炼的假设）提供数值评估
     ## Output:
     # hypothesis_collection: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]
+    # hypothesis_collection: [[hyp0,推理过程0,反馈0], [hyp1,推理过程1,反馈1], ...]
     def hyothesis_generation_with_refinement(self, backgroud_question, backgroud_survey, cur_insp_core_node, other_mutations=None, recombination_type=0, this_mutation=None, if_self_eval_for_final_hyp=True):
         assert recombination_type in [0, 1, 2]
         # this_mutation is used iff recombination_type=2
@@ -877,8 +923,17 @@ class HypothesisGenerationEA(object):
     
 
     def save_file(self, data, file_path):
-        with open(file_path, 'w') as f:
-            json.dump(data, f)
+        # 获取文件所在目录
+        directory = os.path.dirname(file_path)
+        
+        # 如果目录不存在，则创建
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)  # 可以创建多级目录
+        
+        # 保存文件
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
         print("Saved data to {}".format(file_path))
 
 

@@ -6,6 +6,7 @@ from Method.logging_utils import setup_logger
 from google import genai
 
 
+#这个是主文件
 
 # Coarse grained inspiration screening
 class Screening(object):
@@ -14,6 +15,9 @@ class Screening(object):
         self.args = args
         self.custom_rq = custom_rq
         self.custom_bs = custom_bs
+
+        #api设置
+
         ## Set API client
         # openai client
         if args.api_type == 0:
@@ -29,16 +33,29 @@ class Screening(object):
             self.client = genai.Client(api_key=args.api_key)
         else:
             raise NotImplementedError
+        #传入选择的基准或自定义研究问题
+
         ## Load research background: Use the research question and background survey in Tomato-Chem or the custom ones from input
+
+        # 使用Tomato-Chem基准数据
         if custom_rq == None and custom_bs == None:
             # annotated bkg research question and its annotated groundtruth inspiration paper titles
+            #调用load_chem_annotation函数加载化学注释数据
+
             self.bkg_q_list, self.dict_bkg2insp, self.dict_bkg2survey, self.dict_bkg2groundtruthHyp, self.dict_bkg2note, self.dict_bkg2idx, self.dict_idx2bkg, self.dict_bkg2reasoningprocess = load_chem_annotation(args.chem_annotation_path, self.args.if_use_strict_survey_question, self.args.if_use_background_survey)     
         else:
+            # 使用自定义研究背景和官方背景的时候，数据结构不一样，官方的论文输入多一点
+
             print("INFO: Using custom_rq and custom_bs.")
             assert custom_rq != None
             self.bkg_q_list = [custom_rq]
             self.dict_bkg2survey = {custom_rq: custom_bs}
             self.dict_idx2bkg = {0: custom_rq} 
+
+            # bkg_q_list: 只包含一个研究问题的列表
+            # dict_bkg2survey: 单一映射，研究问题到背景调查
+            # dict_idx2bkg: 单一映射，索引0到研究问题
+
         ## Load inspiration corpus (by default is the groundtruth inspiration papers and random high-quality papers)
         # title_abstract_collector: [[title, abstract], ...]
         # dict_title_2_abstract: {'title': 'abstract', ...}
@@ -47,42 +64,45 @@ class Screening(object):
 
     # The main function to run coarse-grained inspiration screening. Multiple rounds of screening for each background research question supported.
     def run(self):
-        # Dict_bkg_q_2_screen_results: {'bq': [screen_results_round1, screen_results_round2, ...], ...}
+        # Dict_bkg_q_2_screen_results: {'bq': [screen_results_round1, screen_results_round2, ...], ...}存储每个研究问题的多轮筛选结果
         Dict_bkg_q_2_screen_results = {}
-        # Dict_bkg_q_2_ratio_hit: {'bq': [ratio_hit_round1, ratio_hit_round2, ...], ...}
+        # Dict_bkg_q_2_ratio_hit: {'bq': [ratio_hit_round1, ratio_hit_round2, ...], ...}存储每个研究问题的多轮命中率
         # ratio_hit_round1/2/..: [ratio_hit_in_top1, ratio_hit_in_top3]
         Dict_bkg_q_2_ratio_hit = {}
         # initialize Screening
         full_bkg_questions = self.bkg_q_list
         # looping around research backgrounds to find coarse-grained inspirations
-        for cur_bkg_q_id, cur_bkg_q in enumerate(full_bkg_questions):
-            if self.args.background_question_id != -1 and cur_bkg_q_id != self.args.background_question_id:
+        for cur_bkg_q_id, cur_bkg_q in enumerate(full_bkg_questions):           #遍历所有研究问题
+            if self.args.background_question_id != -1 and cur_bkg_q_id != self.args.background_question_id: #特定的研究问题ID时不等于-1，可以debug
                 continue
-            print("\nID: {}; bkg_q: {}".format(cur_bkg_q_id, cur_bkg_q))
+            print("\nID: {}; bkg_q: {}".format(cur_bkg_q_id, cur_bkg_q))    #输出id和问题
             # screen_results for multiple rounds
             for cur_screen_round in range(self.args.num_round_of_screening):
                 if cur_screen_round == 0:
-                    # first round of screening, inspiration_candidates are the full inspirations corpus
+                    # 第一轮筛选，灵感候选集即完整灵感语料库，后续轮次使用上一轮筛选的结果
                     cur_next_round_inspiration_candidates = self.title_abstract_collector
                 print("\nScreening Round: {}; Number of inspiration candidates: {}".format(cur_screen_round, len(cur_next_round_inspiration_candidates)))
+
+                #调用one_round_screening方法执行单轮筛选，该方法返回两个值：screen_results: 当前轮的筛选结果，cur_next_round_inspiration_candidates: 下一轮的候选灵感
                 screen_results, cur_next_round_inspiration_candidates = self.one_round_screening(cur_bkg_q, cur_next_round_inspiration_candidates)
                 print("Screening Round: {}; len(screen_results): {}".format(cur_screen_round, len(screen_results)))
+
                 # ratio_hit: [ratio_hit_in_top1, ratio_hit_in_top3]
-                # when using custom_rq, we don't know the groundtruth insp to check ratio hit
+                # when using custom_rq, we don't know the groundtruth insp to check ratio hit，自定义模式没有gt，所以没有命中率
                 if self.custom_rq == None:
                     ratio_hit = self.check_how_many_hit_groundtruth_insp(cur_bkg_q, screen_results)
                 if cur_screen_round == 0:
-                    assert cur_bkg_q not in Dict_bkg_q_2_screen_results
+                    assert cur_bkg_q not in Dict_bkg_q_2_screen_results             #防止数据重复或覆盖
                     assert cur_bkg_q not in Dict_bkg_q_2_ratio_hit
-                    Dict_bkg_q_2_screen_results[cur_bkg_q] = [screen_results]
+                    Dict_bkg_q_2_screen_results[cur_bkg_q] = [screen_results]       #第一轮时初始化字典条目
                     if self.custom_rq == None:
                         Dict_bkg_q_2_ratio_hit[cur_bkg_q] = [ratio_hit]
-                else:
+                else:                                                               #后续轮追加
                     Dict_bkg_q_2_screen_results[cur_bkg_q].append(screen_results)
                     if self.custom_rq == None:
                         Dict_bkg_q_2_ratio_hit[cur_bkg_q].append(ratio_hit)
                 
-        # organize raw inspirations
+        # 整理原始筛选结果
         # Dict_bkg_q_2_screen_results: {'bq': [screen_results_round1, screen_results_round2, ...], ...}
         #   screen_results_round1: [[[title, reason], [title, reason]], [[title, reason], [title, reason]], ...]
         # organized_Dict_bkg_q_2_screen_results: {'bq': [screen_results_round1_org, screen_results_round2_org, ...]}
@@ -106,12 +126,12 @@ class Screening(object):
 
 
     ## Function
-    #   one round of screening, select args.num_screening_keep_size inspiration papers from args.num_screening_window_size inspiration candidates
+    #   进行一轮筛选，从 args.num_screening_window_size 篇候选灵感论文中选取 args.num_screening_keep_size 篇保留论文
     ## Input
-    #   bkg_research_question: background research question (text)
-    #   inspiration_candidates: inspiration corpus to select matched ones with the background: [[title, abstract], [title, abstract], ...]
+    #     bkg_research_question: 背景研究问题（文本）
+    #   创意候选集：用于筛选与背景匹配的创意语料库：[[title, abstract], [title, abstract], ...]
     ## Output
-    #   screen_results: [[[title, reason], [title, reason]], [[], []], ...]
+    #   筛选结果集： [[[title, reason], [title, reason]], [[], []], ...]
     #   next_round_inspiration_candidates: [[title, abstract], [title, abstract], ...]
     def one_round_screening(self, bkg_research_question, inspiration_candidates=None):
         # when self.custom_rq is not None, we don't need to check this (and also we won't initialize self.dict_bkg2insp)
@@ -172,7 +192,7 @@ class Screening(object):
         return screen_results, next_round_inspiration_candidates
 
         
-    # obtain ratio_hit_in_top1 and ratio_hit_in_top3
+    # 获取top1命中率和top3命中率
     def check_how_many_hit_groundtruth_insp(self, bkg_research_question, screen_results):
         all_extracted_titles = []
         top1_extracted_titles = []
@@ -218,6 +238,9 @@ class Screening(object):
 
 
 if __name__ == '__main__':
+
+    #传入配置文件
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, default="chatgpt", help="model name: gpt4/chatgpt/chatgpt16k/claude35S/gemini15P/llama318b/llama3170b/llama31405b")
     parser.add_argument("--api_type", type=int, default=1, help="0: openai's API toolkit; 1: azure's API toolkit")
@@ -249,21 +272,25 @@ if __name__ == '__main__':
     assert args.if_use_background_survey in [0, 1]
     assert args.num_round_of_screening >= 1 and args.num_round_of_screening <= 4
     # args.output_dir = os.path.abspath(args.output_dir)
+    
+    #传入研究问题和背景
 
     ## initialize research question and background survey to text to use them for inference (by default they are set to those in the Tomato-Chem benchmark)
     if args.custom_research_background_path.strip() == "":
         custom_rq, custom_bs = None, None
-        print("Using the research background in the Tomato-Chem benchmark.")
+        print("Using the research background in the Tomato-Chem benchmark.")    #如果为空，使用默认参数
     else:
-        assert os.path.exists(args.custom_research_background_path), "The research background file does not exist: {}".format(args.custom_research_background_path)
+        assert os.path.exists(args.custom_research_background_path), "The research background file does not exist: {}".format(args.custom_research_background_path)     #断言文件存在
         with open(args.custom_research_background_path, 'r') as f:
             research_background = json.load(f)
-        # research_background: [research question, background survey]
+        # research_background: [research question, background survey]   期望JSON内容是一个包含两个元素的列表：研究问题（字符串）和背景调查（字符串）
         assert len(research_background) == 2
         assert isinstance(research_background[0], str) and isinstance(research_background[1], str)
         custom_rq = research_background[0]
         custom_bs = research_background[1]
         print("Using custom research background. \nResearch question: \n{}; \n\nBackground survey: \n{}".format(custom_rq, custom_bs))
+    
+    #验证灵感库文件
 
     ## change inspiration corpus path to the default corpus if it is not assigned by users
     if args.custom_inspiration_corpus_path.strip() == "":
@@ -273,6 +300,7 @@ if __name__ == '__main__':
         assert os.path.exists(args.custom_inspiration_corpus_path), "The inspiration corpus file does not exist: {}".format(args.custom_inspiration_corpus_path)
         print("Using custom inspiration corpus: {}".format(args.custom_inspiration_corpus_path))
 
+    #设置了日志记录器并将标准输出重定向到日志文件
 
     ## Setup logger
     logger = setup_logger(args.output_dir)
