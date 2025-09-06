@@ -6,7 +6,11 @@
 #SBATCH -N 1               
 #SBATCH -n 1               
 #SBATCH --gres=gpu:0
-
+"""
+git add .
+git commit -m 'update'
+git push
+"""
 
 # api_type: Set to 0 for OpenAI API key, or 1 for Azure OpenAI API key.
 api_type=0

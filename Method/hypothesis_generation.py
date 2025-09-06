@@ -135,13 +135,13 @@ class HypothesisGenerationEA(object):
 
     
     ## Function
-    # Controller for the second inspiration step hypothesis generation (by second round inspiration screening or self-exploration of extra knowledge)
-    #   Mainly to determine which recom_inspiration_ids and which self_explore_inspiration_ids for further exploration
-    #       1. when recom_inspiration_ids == [] or self_explore_inspiration_ids == [], we will determine them based on the self-evaluation scores of the best hypothesis from each inspiration
-    #       2. when -1 in recom_inspiration_ids or -1 in self_explore_inspiration_ids, we will explore over all inspirations
-    #       3. when recom_inspiration_ids or self_explore_inspiration_ids is specified, we will explore over the specified inspirations, w/o determining them based on the self-evaluation scores of the best hypothesis from each inspiration
+    # 用于第二轮灵感步骤假设生成的控制器（通过第二轮灵感筛选或额外知识的自我探索）,这段代码实现了一个控制器功能，用于管理第二轮及以后的灵感步骤假设生成过程。它负责确定哪些灵感节点需要进一步探索，并协调两种不同的探索策略
+    #    主要用于确定哪些推荐灵感ID（recom_inspiration_ids）和自主探索灵感ID（self_explore_inspiration_ids）需进一步探索
+    #       1. 当recomm_inspiration_ids == [] 或 self_explore_inspiration_ids == [] 时，根据各灵感来源最佳假设的自我评估分数确定探索对象
+    #       2. 若 recom_inspiration_ids 或 self_explore_inspiration_ids 包含 -1，则探索全部灵感节点
+    #       3. 若指定 recom_inspiration_ids 或 self_explore_inspiration_ids，则仅探索指定节点，且不依据各灵感节点最佳假设的自我评估分数进行筛选
     ## Input
-    #   step_id: int; 1: about the first layer of inspiration/hypothesis node; 2: about the second layer of inspiration/hypothesis node; 3: about the third layer of inspiration/hypothesis node; ...
+    #   step_id: int; step_id: 整数；1：关于灵感/假设节点的第一层；2：关于第二层；3：关于第三层；
     def controller_additional_inspiration_step_hypothesis_generation(self, background_question_id, final_data_collection, step_id):
         assert step_id >= 2
         if self.args.if_mutate_between_diff_insp == 1 or self.args.if_self_explore == 1:
@@ -608,20 +608,22 @@ class HypothesisGenerationEA(object):
 
 
     ## Function
-    # a full knowledge discovery procedure (to find the second and the third key points) by self-explored extra knowledge for one bkg one insp node (the insp node is the first key point)
-    ## Input
+    #  通过自主探索的额外知识，为一个背景节点和一个启发节点（启发节点为首个关键点）执行完整的知识发现流程（用于寻找第二个和第三个关键点）
+    ## input
     # backgroud_question: text  
     # backgroud_survey: text
-    # cur_insp_core_node: [title, reason, abstract]
-    # origin_hyp_node: text: the (final) hypothesis from the bkg root node + one insp secondary node
+    # cur_insp_core_node: [title, reason, abstract]     当前启发核心节点
+    # origin_hyp_node: text: the (final) hypothesis from the bkg root node + one insp secondary node    原始假设节点: 文本: 由背景根节点 + 一个启发式次级节点生成的（最终）假设
     ## Output
+    # 自探索知识假设集合: {变异ID: [[额外知识0, 输出假设0, 推理过程0, 反馈0, 精炼假设0], ...], ...} 
     # self_explored_knowledge_hypothesis_collection: {mutation_id: [[extra_knowledge_0, output_hyp_0, reasoning_process_0, feedback_0, refined_hyp_0], ...], ...}
+    
     def self_explore_extra_knowledge_one_bkg_one_insp_node_full_steps(self, backgroud_question, backgroud_survey, cur_insp_core_node, origin_hyp_node):
-        ## develop one mutation line first, and then develop the second mutation line, and then ...
-        self_explored_knowledge_hypothesis_collection = {}
-        for cur_mutation_id in range(self.args.num_mutations):
-            for cur_iter_explore_id in range(self.args.num_self_explore_steps_each_line):
-                if cur_mutation_id == 0 and cur_iter_explore_id == 0:
+        ## 先培育一条突变系，然后培育第二条突变系 and then ...
+        self_explored_knowledge_hypothesis_collection = {}      #用于存储所有突变线的探索结果
+        for cur_mutation_id in range(self.args.num_mutations):  #产生num_mutations个突变线
+            for cur_iter_explore_id in range(self.args.num_self_explore_steps_each_line):       #对每个突变线执行多轮探索步骤（由num_self_explore_steps_each_line参数控制）
+                if cur_mutation_id == 0 and cur_iter_explore_id == 0:                   #第一个突变线的第一步：使用原始假设节点(origin_hyp_node
                     input_hyp = origin_hyp_node
                     other_mutations = None
                 else:
@@ -632,7 +634,7 @@ class HypothesisGenerationEA(object):
                     if cur_mutation_id == 0:
                         other_mutations = None
                     else:
-                        other_mutations = [self_explored_knowledge_hypothesis_collection[mut_id][-1][4] for mut_id in self_explored_knowledge_hypothesis_collection]
+                        other_mutations = [self_explored_knowledge_hypothesis_collection[mut_id][-1][4] for mut_id in self_explored_knowledge_hypothesis_collection]        #同一突变线的后续步骤：使用上一步的精炼假设([-1][4])
                 # hypothesis_collection: [extra_knowledge_0, output_hyp_0, reasoning_process_0, feedback_0, refined_hyp_0(, [score_collection, score_reason_collection])]; "(, [score_collection, score_reason_collection]) added if it is the last hypothesis in each line of mutation"
                 if_hyp_need_extra_knowledge, hypothesis_collection = self.self_explore_extra_knowledge_and_hyp_gene_and_refinement_single_step(backgroud_question, backgroud_survey, cur_insp_core_node, input_hyp=input_hyp, other_mutations=other_mutations)
                 assert if_hyp_need_extra_knowledge == 'Yes' or if_hyp_need_extra_knowledge == 'No'
