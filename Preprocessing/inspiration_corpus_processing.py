@@ -85,7 +85,9 @@ class InspCorpusProcessing(object):
         final_collection.append(["Nitrate reduction enables safer aryldiazonium chemistry", "Aryldiazonium salts remain a staple in organic synthesis and are still prepared largely in accord with the protocol developed in the 19th century. Because of the favorable reactivity that often cannot be achieved with other aryl(pseudo)halides, diazonium chemistry continues to grow. Facile extrusion of dinitrogen contributes to the desired reactivity but is also reason for safety concerns. Explosions have occurred since the discovery of these reagents and still result in accidents. In this study, we report a diazonium chemistry paradigm shift based on nitrate reduction using thiosulfate or dihalocuprates as electron donors that avoids diazonium accumulation. Because nitrate reduction is rate-limiting, aryldiazoniums are produced as fleeting intermediates, which results in a safer and often more efficient deaminative halogenation in a single step from anilines."])
         # save
         print("len(final_collection): ", len(final_collection))
-        with open("final_collection_3000.json", 'w') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        file_path = "final_collection_3000.json".replace(':', '-')
+        with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(final_collection, f)
 
 
@@ -359,7 +361,9 @@ class InspCorpusProcessing(object):
 
     # non_gdth_insp_paper_num: the number of (noise) papers to be added
     def add_non_gdth_insp_papers_to_existing_collection(self, non_gdth_insp_paper_num):
-        with open(self.args.json_file_path, 'r') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        json_file_path = self.args.json_file_path.replace(':', '-')
+        with open(json_file_path, 'r', encoding='utf-8') as f:
             # random_papers: [[title, abstract], ...]
             random_papers = json.load(f)
         assert len(random_papers) >= non_gdth_insp_paper_num
@@ -378,7 +382,9 @@ class InspCorpusProcessing(object):
         # shuffle background very relevant papers to random ones
         random.shuffle(self.title_abstract_collector)
         # save
-        with open(self.args.output_dir, 'w') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        output_dir = self.args.output_dir.replace(':', '-')
+        with open(output_dir, 'w', encoding='utf-8') as f:
             json.dump(self.title_abstract_collector, f)
 
 

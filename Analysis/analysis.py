@@ -32,7 +32,7 @@ def analysis_list_of_list_of_scores(list_of_list_of_scores):
 # gold_insp_scores, other_insp_scores: [ave_score0, ave_score1, ave_score2, ave_score3]
 def compare_score_between_gold_insp_and_others(final_data_collection_path, target_bkg, gold_insps):
     # load final_data_collection
-    with open(final_data_collection_path, 'r') as f:
+    with open(final_data_collection_path, 'r', encoding='utf-8') as f:
         final_data_collection = json.load(f)
 
     # check input parameters
@@ -82,7 +82,7 @@ def compare_score_between_gold_insp_and_others(final_data_collection_path, targe
 # compare_score_between_inter_recom_and_self_explore
 def compare_score_between_inter_recom_and_self_explore(final_data_collection_path, target_bkg):
     # load final_data_collection
-    with open(final_data_collection_path, 'r') as f:
+    with open(final_data_collection_path, 'r', encoding='utf-8') as f:
         final_data_collection = json.load(f)
 
     # check input parameters: should only have one background question as key (the current code is only designed for one background question)
@@ -140,7 +140,7 @@ def compare_score_between_inter_recom_and_self_explore(final_data_collection_pat
 
 def find_highest_scored_hypothesis_from_first_round(final_data_collection_path, target_bkg, display_rank_idx=0):
     # load final_data_collection
-    with open(final_data_collection_path, 'r') as f:
+    with open(final_data_collection_path, 'r', encoding='utf-8') as f:
         final_data_collection = json.load(f)
 
     best_ave_score_list = []
@@ -174,7 +174,7 @@ def find_highest_scored_hypothesis_from_first_round(final_data_collection_path, 
 
 def find_highest_scored_hypothesis_from_second_round(final_data_collection_path, target_bkg, display_rank_idx=0, round_id=2):
     # load final_data_collection
-    with open(final_data_collection_path, 'r') as f:
+    with open(final_data_collection_path, 'r', encoding='utf-8') as f:
         final_data_collection = json.load(f)
 
     inter_recom_mut_id = "inter_recom_{}".format(round_id-1)
@@ -236,10 +236,10 @@ def compare_similarity_between_inspiration_retrieval_and_similarity_retrieval(in
     title_abstract_collector, dict_title_2_abstract = load_dict_title_2_abstract(title_abstract_collector_path=title_abstract_all_insp_literature_path)     
     groundtruth_insp_titles = list(dict_title_2_abstract.keys())
 
-    with open(insp_file_path, 'r') as f:
+    with open(insp_file_path, 'r', encoding='utf-8') as f:
         insp_data = json.load(f)
         insp_data = insp_data[0]
-    with open(simi_file_path, 'r') as f:
+    with open(simi_file_path, 'r', encoding='utf-8') as f:
         simi_data = json.load(f)
         simi_data = simi_data[0]
 
@@ -314,7 +314,7 @@ def get_average_screened_insp_hit_ratio_from_a_series_of_files(file_root_name_pa
         if not os.path.exists(cur_file_path):
             print("Warning: file not exists: ", cur_file_path)
             continue
-        with open(cur_file_path, 'r') as f:
+        with open(cur_file_path, 'r', encoding='utf-8') as f:
             cur_data = json.load(f)
         cur_hit_ratio_data = cur_data[1]
         cur_bkg_key = list(cur_hit_ratio_data.keys())
@@ -365,7 +365,7 @@ def get_top_matched_score_for_each_background(file_root_name_path, data_id_range
         assert cur_gdth_insp_necessary_cnt in [1, 2, 3]
         # load file
         cur_file_path = file_root_name_path + str(cur_id) + ".json"
-        with open(cur_file_path, 'r') as f:
+        with open(cur_file_path, 'r', encoding='utf-8') as f:
             cur_data = json.load(f)
         # cur_matched_score_collection: [top_matched_score0, top_matched_score1, ...] (sorted in descending order)
         cur_matched_score_collection = []
@@ -478,10 +478,14 @@ def get_top_matched_score_for_each_background(file_root_name_path, data_id_range
     # save selected_hyp_for_expert_eval
     if if_save:
         if get_expert_eval_file_type == 1:
-            with open("./expert_eval_for_selected_hyp_in_exp_5.json", 'w') as f:
+            # 处理文件名中的特殊字符，避免文件系统问题
+            file_path = "./expert_eval_for_selected_hyp_in_exp_5.json".replace(':', '-')
+            with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(selected_hyp_for_expert_eval, f)
         elif get_expert_eval_file_type == 2:
-            with open("./expert_eval_for_selected_hyp_in_exp_8.json", 'w') as f:
+            # 处理文件名中的特殊字符，避免文件系统问题
+            file_path = "./expert_eval_for_selected_hyp_in_exp_8.json".replace(':', '-')
+            with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(selected_hyp_for_expert_eval, f)
 
           
@@ -554,7 +558,7 @@ def get_average_ranking_position_for_hyp_with_gdth_insp(file_root_name_path, dat
         cur_gdth_insps = dict_bkg2insp[cur_bkg_q_ori]
         # load file
         cur_file_path = file_root_name_path + str(cur_id) + ".json"
-        with open(cur_file_path, 'r') as f:
+        with open(cur_file_path, 'r', encoding='utf-8') as f:
             cur_data = json.load(f)
         # ranked_hypothesis_collection: {backgroud_question: ranked_hypothesis, ...}
         #   ranked_hypothesis: [[hyp, ave_score, scores, core_insp_title, round_id, [first_round_mutation_id, second_round_mutation_id]], ...] (sorted by average score, in descending order)
@@ -680,10 +684,10 @@ def get_average_ranking_position_for_hyp_with_gdth_insp(file_root_name_path, dat
 # expert_eval_file: {bkg_id: {q_id: [gene_hyp, gdth_hyp, cnt_matched_insp, cur_matched_score, cur_matched_score_reason, expert_matched_score]}}
 # second_expert_eval_file_path: if not None, then compare the matched score between two experts, else only compare the matched score between the model and the expert
 def read_expert_eval_results(expert_eval_file_path, second_expert_eval_file_path=None):
-    with open(expert_eval_file_path, "r") as f:
+    with open(expert_eval_file_path, "r", encoding='utf-8') as f:
         expert_eval_file = json.load(f)
     if second_expert_eval_file_path != None:
-        with open(second_expert_eval_file_path, "r") as f:
+        with open(second_expert_eval_file_path, "r", encoding='utf-8') as f:
             second_expert_eval_file = json.load(f)
     seperate_bkg_id = 30
     num_q_per_bkg = 4
@@ -759,7 +763,7 @@ def read_expert_eval_results(expert_eval_file_path, second_expert_eval_file_path
 #   all_steps_idx: [selected_hyp_idx, (optional) prev index of selected_hyp_idx, (optional) prev prev index of selected_hyp_idx]
 def find_full_reasoning_line(eval_file_dir, bkg_idx=0, selected_hyp_idx=0):
     eval_file_dir = eval_file_dir + str(bkg_idx) + ".json"
-    with open(eval_file_dir, 'r') as f:
+    with open(eval_file_dir, 'r', encoding='utf-8') as f:
         d = json.load(f)
     b = list(d[0].keys())[0]
     # select a hyp to find its source; here we just use the first hyp
@@ -846,7 +850,7 @@ def analyze_EU_find_proportion(eval_file_dir, start_bkg_idx=0, end_bkg_idx=51, t
     total_eu_scores = []
     total_recom_scores = []
     for cur_bkg_idx in range(start_bkg_idx, end_bkg_idx):
-        with open(eval_file_dir+str(cur_bkg_idx)+".json", 'r') as f:
+        with open(eval_file_dir+str(cur_bkg_idx)+".json", 'r', encoding='utf-8') as f:
             full_data = json.load(f)
             b = list(full_data[1].keys())[0]
         cur_non_eu_scores = []

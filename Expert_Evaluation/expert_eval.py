@@ -14,13 +14,13 @@ class ExpertEval(object):
         self.seperate_bkg_id = 30
 
     def load_data(self):
-        with open(self.input_data_path, "r") as f:
+        with open(self.input_data_path, "r", encoding='utf-8') as f:
             data = json.load(f)
         return data
 
 
     def save_data(self, data):
-        with open(self.output_data_path, "w") as f:
+        with open(self.output_data_path, "w", encoding='utf-8') as f:
             json.dump(data, f)
 
 
@@ -44,7 +44,7 @@ class ExpertEval(object):
         last_bkg_id_to_resume = None
         last_q_id_to_resume = None
         if os.path.exists(self.output_data_path):
-            with open(self.output_data_path, "r") as f:
+            with open(self.output_data_path, "r", encoding='utf-8') as f:
                 prev_output_file = json.load(f)
                 self.data = prev_output_file
                 # print("prev_output_file.keys(): ", prev_output_file.keys())

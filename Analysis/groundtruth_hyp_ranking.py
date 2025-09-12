@@ -59,7 +59,9 @@ class GroundTruth_Hyp_Ranking(object):
     #   first_index_ratio, last_index_ratio: [0, 1]
     def get_rank_ratio_for_each_hyp(self, cur_id_bkg, cur_bkg, cur_score_collection):
         # generated hypothesis and their R(h)
-        with open(args.evaluate_result_dir + str(cur_id_bkg) + ".json", 'r') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        file_path = (args.evaluate_result_dir + str(cur_id_bkg) + ".json").replace(':', '-')
+        with open(file_path, 'r', encoding='utf-8') as f:
             full_evaluate_result = json.load(f)
         # ranked_hypothesis_collection: {backgroud_question: ranked_hypothesis, ...}
             #   ranked_hypothesis: [[hyp, ave_score, scores, core_insp_title, round_id, [first_round_mutation_id, second_round_mutation_id]], ...] (sorted by average score, in descending order)
@@ -160,7 +162,9 @@ class GroundTruth_Hyp_Ranking(object):
         ave_ave_index_ratio = np.mean(ave_index_ratio_list)
         # save
         if args.if_save:
-            with open(args.output_dir, 'w') as f:
+            # 处理文件名中的特殊字符，避免文件系统问题
+            output_dir = args.output_dir.replace(':', '-')
+            with open(output_dir, 'w', encoding='utf-8') as f:
                 json.dump(groundtruthHyp_fourScores_collection, f)
         return ave_ave_index_ratio
 
@@ -195,7 +199,9 @@ if __name__ == "__main__":
         # groundtruthHyp_fourScores_collection: [[cur_id_bkg, cur_score_collection, cur_score_reason_collection, final_ratio_overall_and_four_aspects], ...]
         #   final_ratio_overall_and_four_aspects: [[first_ratio, last_ratio, ave_ratio], ...] (average score, validness score, novelty score, significance score, potential score)
         print("{} already exists.".format(args.output_dir))
-        with open(args.output_dir, 'r') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        output_dir = args.output_dir.replace(':', '-')
+        with open(output_dir, 'r', encoding='utf-8') as f:
             groundtruthHyp_fourScores_collection = json.load(f)
         ave_index_ratio_list = [groundtruthHyp_fourScores_collection[id][3][0][2] for id in range(len(groundtruthHyp_fourScores_collection))]
         ave_index_ratio_validness_list = [groundtruthHyp_fourScores_collection[id][3][1][2] for id in range(len(groundtruthHyp_fourScores_collection))]

@@ -41,7 +41,9 @@ def load_title_abstract(raw_data_dir, custom_inspiration_corpus_path):
     print("all_ttl_abs[0]:", all_ttl_abs[0])
 
     # save to json file
-    with open(custom_inspiration_corpus_path, 'w') as f:
+    # 处理文件名中的特殊字符，避免文件系统问题
+    custom_inspiration_corpus_path = custom_inspiration_corpus_path.replace(':', '-')
+    with open(custom_inspiration_corpus_path, 'w', encoding='utf-8') as f:
         json.dump(all_ttl_abs, f, indent=4)
     return all_ttl_abs
 

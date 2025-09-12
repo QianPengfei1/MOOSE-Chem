@@ -111,9 +111,11 @@ class Screening(object):
         
         # save files
         if self.args.if_save:
-            # === 关键修复：确保输出目录存在 ===
+            # === 关键修复：确保输出目录存在并处理文件名中的特殊字符 ===
             import os
             output_dir = self.args.output_dir
+            # 将模型名称中的冒号替换为连字符，避免文件系统问题
+            output_dir = output_dir.replace(':', '-')
             os.makedirs(os.path.dirname(output_dir), exist_ok=True)
 
             # 保存文件
@@ -281,7 +283,7 @@ if __name__ == '__main__':
         print("Using the research background in the Tomato-Chem benchmark.")    #如果为空，使用默认参数
     else:
         assert os.path.exists(args.custom_research_background_path), "The research background file does not exist: {}".format(args.custom_research_background_path)     #断言文件存在
-        with open(args.custom_research_background_path, 'r') as f:
+        with open(args.custom_research_background_path, 'r', encoding='utf-8') as f:
             research_background = json.load(f)
         # research_background: [research question, background survey]   期望JSON内容是一个包含两个元素的列表：研究问题（字符串）和背景调查（字符串）
         assert len(research_background) == 2
@@ -303,7 +305,9 @@ if __name__ == '__main__':
     #设置了日志记录器并将标准输出重定向到日志文件
 
     ## Setup logger
-    logger = setup_logger(args.output_dir)
+    # 处理输出路径中的特殊字符，避免日志文件路径问题
+    safe_output_dir = args.output_dir.replace(':', '-')
+    logger = setup_logger(safe_output_dir)
     # Redirect print to logger
     def custom_print(*args, **kwargs):
         message = " ".join(map(str, args))
@@ -316,7 +320,9 @@ if __name__ == '__main__':
     
     
     # run Screening
-    if os.path.exists(args.output_dir):
+    # 检查实际保存的文件路径（处理特殊字符后的路径）
+    safe_output_dir = args.output_dir.replace(':', '-')
+    if os.path.exists(safe_output_dir):
         print("Warning: The output_dir already exists. Will skip this retrival.")
     else:
         screening = Screening(args, custom_rq=custom_rq, custom_bs=custom_bs)

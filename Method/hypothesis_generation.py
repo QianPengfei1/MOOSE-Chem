@@ -925,6 +925,9 @@ class HypothesisGenerationEA(object):
     
 
     def save_file(self, data, file_path):
+        # 处理文件名中的特殊字符，避免文件系统问题
+        file_path = file_path.replace(':', '-')
+        
         # 获取文件所在目录
         directory = os.path.dirname(file_path)
         
@@ -1036,7 +1039,7 @@ if __name__ == "__main__":
         print("Using the research background in the Tomato-Chem benchmark.")
     else:
         assert os.path.exists(args.custom_research_background_path), "The research background file does not exist: {}".format(args.custom_research_background_path)
-        with open(args.custom_research_background_path, 'r') as f:
+        with open(args.custom_research_background_path, 'r', encoding='utf-8') as f:
             research_background = json.load(f)
         # research_background: [research question, background survey]
         assert len(research_background) == 2
@@ -1058,15 +1061,19 @@ if __name__ == "__main__":
 
     # load from existing collection
     if args.if_load_from_saved == 1:
-        with open(args.output_dir, 'r') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        safe_output_dir = args.output_dir.replace(':', '-')
+        with open(safe_output_dir, 'r', encoding='utf-8') as f:
             final_data_collection = json.load(f)
     else:
         final_data_collection = None
    
     # skip if the output_dir already exists
     # Q: overlook args.if_load_from_saved for recent experiments
-    if os.path.exists(args.output_dir):
-        print("Warning: {} already exists.".format(args.output_dir))
+    # 检查实际保存的文件路径（处理特殊字符后的路径）
+    safe_output_dir = args.output_dir.replace(':', '-')
+    if os.path.exists(safe_output_dir):
+        print("Warning: {} already exists.".format(safe_output_dir))
     else:
         # initialize an object
         hyp_gene_ea = HypothesisGenerationEA(args, custom_rq=custom_rq, custom_bs=custom_bs)

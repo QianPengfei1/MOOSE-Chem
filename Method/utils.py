@@ -228,7 +228,7 @@ def exchange_order_in_list(input_list):
 
 # calculate the ratio if how the selected inspirations hit the groundtruth inspirations. 
 def calculate_average_ratio_top1_top2(file_dir):
-    with open(file_dir, 'r') as f:
+    with open(file_dir, 'r', encoding='utf-8') as f:
         d = json.load(f)
 
     ratio_top1, ratio_top2 = 0, 0
@@ -374,7 +374,7 @@ def load_bkg_and_insp_from_chem_annotation(chem_annotation_path, background_ques
 #   dict_title_2_abstract: {'title': 'abstract', ...}
 def load_dict_title_2_abstract(title_abstract_collector_path):
     ## load title_abstract_collector
-    with open(title_abstract_collector_path, 'r') as f:
+    with open(title_abstract_collector_path, 'r', encoding='utf-8' ) as f:
         # title_abstract_collector: [[title, abstract], ...]
         title_abstract_collector = json.load(f)
     print("Number of title-abstract pairs loaded: ", len(title_abstract_collector))
@@ -394,7 +394,9 @@ def load_dict_title_2_abstract(title_abstract_collector_path):
 ## Output
 # organized_insp: {'bq': [[title, reason], [title, reason], ...]}
 def load_found_inspirations(inspiration_path, idx_round_of_first_step_insp_screening):
-    with open(inspiration_path, 'r') as f:
+    # 处理文件名中的特殊字符，避免文件系统问题
+    inspiration_path = inspiration_path.replace(':', '-')
+    with open(inspiration_path, 'r', encoding='utf-8') as f:
         selected_insp_info = json.load(f)
     # organized_insp: {'bq': [screen_results_round1, screen_results_round2, ...], ...}
     #   screen_results_round1: [[title, reason], [title, reason], ...]
@@ -465,14 +467,16 @@ def organize_raw_inspirations(selected_insp):
 
 # insp_grouping_results: {insp title: [[other insp title, reason], ...]}
 def load_grouped_inspirations(inspiration_group_path):
-    with open(inspiration_group_path, 'r') as f:
+    # 处理文件名中的特殊字符，避免文件系统问题
+    inspiration_group_path = inspiration_group_path.replace(':', '-')
+    with open(inspiration_group_path, 'r', encoding='utf-8') as f:
         insp_grouping_results = json.load(f)
     return insp_grouping_results
 
 
 # coarse_grained_hypotheses: {core_insp_title: [[hypothesis, reasoning process], ...]}
 def load_coarse_grained_hypotheses(coarse_grained_hypotheses_path):
-    with open(coarse_grained_hypotheses_path, 'r') as f:
+    with open(coarse_grained_hypotheses_path, 'r', encoding='utf-8') as f:
         coarse_grained_hypotheses = json.load(f)
     return coarse_grained_hypotheses
     
@@ -902,7 +906,9 @@ def if_element_in_list_with_similarity_threshold(list_elements, element, thresho
 
 
 def save_with_json(data, file_dir):
-    with open(file_dir, 'w') as f:
+    # 处理文件名中的特殊字符，避免文件系统问题
+    file_dir = file_dir.replace(':', '-')
+    with open(file_dir, 'w', encoding='utf-8') as f:
         json.dump(data, f)
 
 

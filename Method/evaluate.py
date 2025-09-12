@@ -34,14 +34,18 @@ class Evaluate(object):
         ## load raw hypothesis
         # final_data_collection: {backgroud_question: {core_insp_title: hypthesis_mutation_collection, ...}, ...}
         #     hypthesis_mutation_collection: {mutation_id: [[hyp0, reasoning process0, feedback0], [hyp1, reasoning process1, feedback1], ...]}; mutation_id: 0, 1, 2, ... & 'recom'
-        with open(args.hypothesis_dir, 'r') as f:
+        # 处理文件名中的特殊字符，避免文件系统问题
+        hypothesis_dir = args.hypothesis_dir.replace(':', '-')
+        with open(hypothesis_dir, 'r', encoding='utf-8') as f:
             self.final_data_collection = json.load(f)
         
 
     def run(self):
         ## obtain ranked_hypothesis_collection and ranked_hypothesis_collection_with_matched_score
         if self.args.if_load_from_saved:
-            with open(self.args.output_dir, 'r') as f:
+            # 处理文件名中的特殊字符，避免文件系统问题
+            safe_output_dir = self.args.output_dir.replace(':', '-')
+            with open(safe_output_dir, 'r', encoding='utf-8') as f:
                 self.ranked_hypothesis_collection, self.ranked_hypothesis_collection_with_matched_score, self.matched_insp_hyp_collection = json.load(f)
                 print("Loaded data from ", self.args.output_dir)
         else:
@@ -62,12 +66,16 @@ class Evaluate(object):
 
         ## save results
         if self.args.if_save == 1:
-            with open(self.args.output_dir, 'w') as f:
+            # 处理文件名中的特殊字符，避免文件系统问题
+            output_dir = self.args.output_dir.replace(':', '-')
+            # 确保输出目录存在
+            os.makedirs(os.path.dirname(output_dir), exist_ok=True)
+            with open(output_dir, 'w', encoding='utf-8') as f:
                 if self.args.if_with_gdth_hyp_annotation == 1:
                     json.dump([self.ranked_hypothesis_collection, self.ranked_hypothesis_collection_with_matched_score, self.matched_insp_hyp_collection], f)
                 else:
                     json.dump([self.ranked_hypothesis_collection], f)
-                print("Results saved to ", self.args.output_dir)
+                print("Results saved to ", output_dir)
 
 
     ## Input
@@ -242,7 +250,9 @@ if __name__ == '__main__':
             print("Warning: using custom inspiration corpus, but requiring to evaluate the hypotheses with groundtruth hypothesis annotation.")
 
     ## Setup logger
-    logger = setup_logger(args.output_dir)
+    # 处理输出路径中的特殊字符，避免日志文件路径问题
+    safe_output_dir = args.output_dir.replace(':', '-')
+    logger = setup_logger(safe_output_dir)
     # Redirect print to logger
     def custom_print(*args, **kwargs):
         message = " ".join(map(str, args))
@@ -254,8 +264,10 @@ if __name__ == '__main__':
 
     # skip if the output_dir already exists
     # Q: overlook args.if_load_from_saved for recent experiments
-    if os.path.exists(args.output_dir):
-        print("Warning: {} already exists.".format(args.output_dir))
+    # 检查实际保存的文件路径（处理特殊字符后的路径）
+    safe_output_dir = args.output_dir.replace(':', '-')
+    if os.path.exists(safe_output_dir):
+        print("Warning: {} already exists.".format(safe_output_dir))
     else:
         evaluate = Evaluate(args)
         evaluate.run()
